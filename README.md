@@ -3,13 +3,19 @@
 Ping with DNS requesting.
 
 ### Version
-**DNSPing v0.1 Beta(2014-08-21)**
+**Windows: v0.1 Beta(2014-08-23)**
+**Linux: v0.1 Beta(2014-08-23)**
 
-### ReadMe(Chinese-Simplified)
-* https://github.com/chengr28/DNSPing/wiki/ReadMe#%E7%94%A8%E6%B3%95
+### ReadMe
+* [Windows(English)](https://github.com/chengr28/DNSPing/wiki/ReadMe)
+* [Windows(Chinese-Simplified)](https://github.com/chengr28/DNSPing/wiki/ReadMe#%E7%94%A8%E6%B3%95)
+* [Linux(English)](https://github.com/chengr28/DNSPing/wiki/ReadMe_Linux)
+* [Linux(Chinese-Simplified)](https://github.com/chengr28/DNSPing/wiki/ReadMe_Linux#%E7%94%A8%E6%B3%95)
 
 ### Usage
 `DNSPing [-h] [-t] [-a] [-n Count] [-f] [-i HopLimit/TTL] [-w Timeout] [-id DNS_ID] [-qr] [-opcode OPCode] [-aa] [-tc] [-rd] [-ra] [-ad] [-cd] [-rcode RCode] [-qn Count] [-ann Count] [-aun Count] [-adn Count] [-ti Time] [-edns0] [-payload Length] [-dnssec] [-qt Type] [-qc Classes] [-p Port] [-raw RAW_Data] [-buf Size] Test_DomainName Target`<br />
+
+* `[-f]` is only available in Windows.<br />
 
 ### Options
 * N/A
@@ -27,7 +33,7 @@ Ping with DNS requesting.
 * `-n Count`
     * Set number of echo requests to send.<br />
     * `Count` must between 1 - 0xFFFF/65535.<br />
-* `-f`
+* `-f`(Windows)
     * Set the `Don't Fragment` flag in outgoing packets(IPv4).<br />
 * `-i HopLimit/TTL`
     * Specifie a `Time To Live` for outgoing packets.<br />
@@ -110,3 +116,6 @@ Ping with DNS requesting.
 
 ### License
 GNU General Public License/GNU GPL v2
+
+### Thanks
+* [tcping.exe - ping over a tcp connection](http://www.elifulkerson.com/projects/tcping.php)

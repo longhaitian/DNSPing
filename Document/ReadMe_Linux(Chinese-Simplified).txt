@@ -1,4 +1,4 @@
-﻿DNSPing v0.1 Beta(Windows)
+﻿DNSPing v0.1 Beta(Linux)
 DNSPing, Ping with DNS requesting.
 Copyright (C) 2014 Chengr28
 
@@ -9,16 +9,14 @@ Copyright (C) 2014 Chengr28
 GitHub 项目页面：
 https://github.com/chengr28/DNSPing
 
-TCPing 项目页面：
-http://www.elifulkerson.com/projects/tcping.php
-* DNSPing 使用的是UDP协议，TCP协议不需要特制的程序进行Ping
-* 直接使用 TCPing 对目标服务器的53端口进行Ping即可
+* DNSPing server with UDP protocol.
+* TCPTraceroute/tcptraceroute 53 port of server if you want to using TCP protocol in Linux.
 
 
 -------------------------------------------------------------------------------
 
 
-用法: DNSPing [-h] [-t] [-a] [-n Count] [-f] [-i HopLimit/TTL] [-w Timeout]
+用法: DNSPing [-h] [-t] [-a] [-n Count] [-i HopLimit/TTL] [-w Timeout]
                [-id DNS_ID] [-qr] [-opcode OPCode] [-aa] [-tc]
                [-rd] [-ra] [-ad] [-cd] [-rcode RCode] [-qn Count]
                [-ann Count] [-aun Count] [-adn Count] [-ti Time] [-edns0]
@@ -39,7 +37,6 @@ http://www.elifulkerson.com/projects/tcping.php
    -a                反向解析地址的域名
    -n Count          发送 Ping 的数量
                      Count 必须介乎于 1 - 0xFFFF/65535
-   -f                设定 Ping 数据包的不分片选项（只适用于IPv4）
    -i HopLimit/TTL   设定 Ping 数据包的生存时间/跳数限制
                      HopLimit/TTL 必须介乎于 1 - 255
    -w Timeout        设定超时时间（单位：毫秒）

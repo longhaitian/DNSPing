@@ -1,4 +1,4 @@
-﻿DNSPing v0.1 Beta(Windows)
+﻿DNSPing v0.1 Beta(Linux)
 DNSPing, Ping with DNS requesting.
 Copyright (C) 2014 Chengr28
 
@@ -9,16 +9,14 @@ Copyright (C) 2014 Chengr28
 Project on GitHub:
 https://github.com/chengr28/DNSPing
 
-TCPing on its website：
-http://www.elifulkerson.com/projects/tcping.php
 * DNSPing server with UDP protocol.
-* TCPing 53 port of server if you want to using TCP protocol.
+* TCPTraceroute/tcptraceroute 53 port of server if you want to using TCP protocol in Linux.
 
 
 -------------------------------------------------------------------------------
 
 
-Usage: DNSPing [-h] [-t] [-a] [-n Count] [-f] [-i HopLimit/TTL] [-w Timeout]
+Usage: DNSPing [-h] [-t] [-a] [-n Count] [-i HopLimit/TTL] [-w Timeout]
                [-id DNS_ID] [-qr] [-opcode OPCode] [-aa] [-tc]
                [-rd] [-ra] [-ad] [-cd] [-rcode RCode] [-qn Count]
                [-ann Count] [-aun Count] [-adn Count] [-ti Time] [-edns0]
@@ -39,7 +37,6 @@ Options:
    -a                Resolve addresses to host names.
    -n Count          Set number of echo requests to send.
                      Count must between 1 - 0xFFFF/65535.
-   -f                Set the "Don't Fragment" flag in outgoing packets(IPv4).
    -i HopLimit/TTL   Specifie a Time To Live for outgoing packets.
                      HopLimit/TTL must between 1 - 255.
    -w Timeout        Set a long wait periods (in milliseconds) for a response.
