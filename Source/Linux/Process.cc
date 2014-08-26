@@ -23,17 +23,18 @@ extern std::string TestDomain, TargetString;
 extern long double TotalTime, MaxTime, MinTime;
 extern size_t SendNum, RealSendNum, RecvNum, TransmissionInterval, BufferSize, RawDataLen;
 extern sockaddr_storage SockAddr;
-extern uint16_t Port;
+extern uint16_t Protocol, ServiceName;
 extern std::shared_ptr<char> RawData;
 extern int IP_HopLimits;
 extern timeval SocketTimeout;
-extern bool /* IPv4_DF, */ EDNS0;
+extern bool RawSocket, /* IPv4_DF, */ EDNS0;
 extern dns_hdr HeaderParameter;
 extern dns_qry QueryParameter;
 extern dns_edns0_label EDNS0Parameter;
+extern FILE *OutputFile;
 
 //Send DNS requesting process
-size_t SendProcess(const uint16_t Protocol, const sockaddr_storage Target)
+size_t SendProcess(const sockaddr_storage Target)
 {
 //Initialization
 	std::shared_ptr<char> Buffer(new char[BufferSize]()), RecvBuffer(new char[BufferSize]());
@@ -47,7 +48,10 @@ size_t SendProcess(const uint16_t Protocol, const sockaddr_storage Target)
 	{
 	//Socket initialization
 		AddrLen = sizeof(sockaddr_in6);
-		Socket = socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP);
+		if (RawSocket && RawData)
+			Socket = socket(AF_INET6, SOCK_RAW, ServiceName);
+		else 
+			Socket = socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP);
 		if (Socket == RETURN_ERROR)
 		{
 			wprintf(L"Socket initialization error, error code is %d.\n", errno);
@@ -58,7 +62,10 @@ size_t SendProcess(const uint16_t Protocol, const sockaddr_storage Target)
 	else {
 	//Socket initialization
 		AddrLen = sizeof(sockaddr_in);
-		Socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+		if (RawSocket && RawData)
+			Socket = socket(AF_INET, SOCK_RAW, ServiceName);
+		else 
+			Socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 		if (Socket == RETURN_ERROR)
 		{
 			wprintf(L"Socket initialization error, error code is %d.\n", errno);
@@ -95,7 +102,7 @@ size_t SendProcess(const uint16_t Protocol, const sockaddr_storage Target)
 		int iIPv4_DF = IP_PMTUDISC_DO;
 		if (IPv4_DF && setsockopt(Socket, IPPROTO_IP, IP_MTU_DISCOVER, &iIPv4_DF, sizeof(int)) == RETURN_ERROR)
 		{
-			wprintf(L"Set Don't Fragment flag error, error code is %d.\n", errno);
+			wprintf(L"Set \"Don't Fragment\" flag error, error code is %d.\n", errno);
 			return EXIT_FAILURE;
 		}
 */
@@ -104,14 +111,15 @@ size_t SendProcess(const uint16_t Protocol, const sockaddr_storage Target)
 //Make packet.
 	if (!RawData)
 	{
-		memcpy(Buffer.get(), &HeaderParameter, sizeof(dns_hdr));
+	//DNS requesting
+		memcpy(Buffer.get() + DataLength, &HeaderParameter, sizeof(dns_hdr));
 		if (HeaderParameter.ID == 0)
 		{
-			auto pdns_hdr = (dns_hdr *)Buffer.get();
+			auto pdns_hdr = (dns_hdr *)(Buffer.get() + DataLength);
 			pdns_hdr->ID = htons(pthread_self());
 		}
 		DataLength += sizeof(dns_hdr);
-		DataLength += CharToDNSQuery((char *)TestDomain.c_str(), Buffer.get() + sizeof(dns_hdr));
+		DataLength += CharToDNSQuery((char *)TestDomain.c_str(), Buffer.get() + DataLength);
 		memcpy(Buffer.get() + DataLength, &QueryParameter, sizeof(dns_qry));
 		DataLength += sizeof(dns_qry);
 		if (EDNS0)
@@ -139,6 +147,8 @@ size_t SendProcess(const uint16_t Protocol, const sockaddr_storage Target)
 		return EXIT_FAILURE;
 	}
 	sendto(Socket, Buffer.get(), DataLength, MSG_NOSIGNAL, (sockaddr *)&Target, AddrLen);
+	
+//Receive.
 	DataLength = recvfrom(Socket, RecvBuffer.get(), BufferSize, MSG_NOSIGNAL, (sockaddr *)&Target, &AddrLen);
 	if (gettimeofday(&AfterTime, NULL) != 0)
 	{
@@ -157,7 +167,12 @@ size_t SendProcess(const uint16_t Protocol, const sockaddr_storage Target)
 //Print to screen.
 	if (DataLength > 0)
 	{
-		wprintf(L"Receive from %s:%u -> %d bytes, waiting %Lf ms.\n", TargetString.c_str(), ntohs(Port), (int)DataLength, Result);
+		wprintf(L"Receive from %s:%u -> %d bytes, waiting %Lf ms.\n", TargetString.c_str(), ntohs(ServiceName), (int)DataLength, Result);
+		
+	//Output to file.
+		if (OutputFile != nullptr)
+			fwprintf(OutputFile, L"Receive from %s:%u -> %d bytes, waiting %Lf ms.\n", TargetString.c_str(), ntohs(ServiceName), (int)DataLength, Result);
+		
 		TotalTime += Result;
 		RecvNum++;
 
@@ -184,6 +199,10 @@ size_t SendProcess(const uint16_t Protocol, const sockaddr_storage Target)
 	}
 	else { //RETURN_ERROR
 		wprintf(L"Receive error: %d(%d), waiting %Lf ms.\n", (int)DataLength, errno, Result);
+		
+	//Output to file.
+		if (OutputFile != nullptr)
+			fwprintf(OutputFile, L"Receive error: %d(%d), waiting %Lf ms.\n", (int)DataLength, errno, Result);
 
 	//Transmission interval
 		if (TransmissionInterval != 0 && TransmissionInterval > Result)
@@ -204,6 +223,15 @@ size_t PrintProcess(const bool PacketStatistics, const bool TimeStatistics)
 		wprintf(L"\nPacket statistics for pinging %s:\n", TargetString.c_str());
 		wprintf(L"   Send: %lu\n", (unsigned long)RealSendNum);
 		wprintf(L"   Receive: %lu\n", (unsigned long)RecvNum);
+		
+	//Output to file.
+		if (OutputFile != nullptr)
+		{
+			fwprintf(OutputFile, L"\nPacket statistics for pinging %s:\n", TargetString.c_str());
+			fwprintf(OutputFile, L"   Send: %lu\n", (unsigned long)RealSendNum);
+			fwprintf(OutputFile, L"   Receive: %lu\n", (unsigned long)RecvNum);
+		}
+		
 		if ((ssize_t)RealSendNum - (ssize_t)RecvNum >= 0)
 		{
 			wprintf(L"   Lost: %lu", (unsigned long)(RealSendNum - RecvNum));
@@ -211,9 +239,23 @@ size_t PrintProcess(const bool PacketStatistics, const bool TimeStatistics)
 				wprintf(L" (%lu%%)\n", (unsigned long)((RealSendNum - RecvNum) * 100 / RealSendNum));
 			else  //Not any packets.
 				wprintf(L"\n");
+				
+		//Output to file.
+			if (OutputFile != nullptr)
+			{
+				fwprintf(OutputFile, L"   Lost: %lu", (unsigned long)(RealSendNum - RecvNum));
+				if (RealSendNum > 0)
+					fwprintf(OutputFile, L" (%lu%%)\n", (unsigned long)((RealSendNum - RecvNum) * 100 / RealSendNum));
+				else  //Not any packets.
+					fwprintf(OutputFile, L"\n");
+			}
 		}
 		else {
 			wprintf(L"   Lost: 0 (0%%)\n");
+			
+		//Output to file.
+			if (OutputFile != nullptr)
+				fwprintf(OutputFile, L"   Lost: 0 (0%%)\n");
 		}
 	}
 
@@ -225,6 +267,15 @@ size_t PrintProcess(const bool PacketStatistics, const bool TimeStatistics)
 		wprintf(L"   Minimum time: %Lf ms.\n", MinTime);
 		wprintf(L"   Maximum time: %Lf ms.\n", MaxTime);
 		wprintf(L"   Average time: %Lf ms.\n", TotalTime / (long double)RecvNum);
+		
+	//Output to file.
+		if (OutputFile != nullptr)
+		{
+			fwprintf(OutputFile, L"\nTime statistics for pinging %s:\n", TargetString.c_str());
+			fwprintf(OutputFile, L"   Minimum time: %Lf ms.\n", MinTime);
+			fwprintf(OutputFile, L"   Maximum time: %Lf ms.\n", MaxTime);
+			fwprintf(OutputFile, L"   Average time: %Lf ms.\n", TotalTime / (long double)RecvNum);
+		}
 	}
 
 	wprintf(L"\n");
@@ -249,8 +300,9 @@ void PrintDescription(void)
 	wprintf(L"               [-id DNS_ID] [-qr] [-opcode OPCode] [-aa] [-tc]\n");
 	wprintf(L"               [-rd] [-ra] [-ad] [-cd] [-rcode RCode] [-qn Count]\n");
 	wprintf(L"               [-ann Count] [-aun Count] [-adn Count] [-ti Time] [-edns0]\n");
-	wprintf(L"               [-payload Length] [-dnssec] [-qt Type] [-qc Classes] [-p Port]\n");
-	wprintf(L"               [-raw RAW_Data] [-buf Size] Test_DomainName Target\n");
+	wprintf(L"               [-payload Length] [-dnssec] [-qt Type] [-qc Classes]\n");
+	wprintf(L"               [-p ServiceName] [-rawdata RAW_Data] [-raw ServiceName]\n");
+	wprintf(L"               [-buf Size] [-of FileName] Test_DomainName Target\n");
 
 //Options
 	wprintf(L"\nOptions:\n");
@@ -273,27 +325,46 @@ void PrintDescription(void)
 	wprintf(L"   -ra               Set DNS header RA flag.\n");
 	wprintf(L"   -ad               Set DNS header AD flag.\n");
 	wprintf(L"   -cd               Set DNS header CD flag.\n");
-	wprintf(L"   -rcode RCode      Specifie DNS header RCode.\n                     OPCode must between 0x0000 - 0x00FF/255\n");
+	wprintf(L"   -rcode RCode      Specifie DNS header RCode.\n                     RCode must between 0x0000 - 0x00FF/255.\n");
 	wprintf(L"   -qn Count         Specifie DNS header Question count.\n                     Question count must between 0x0001 - 0xFFFF/65535.\n");
 	wprintf(L"   -ann Count        Specifie DNS header Answer count.\n                     Answer count must between 0x0001 - 0xFFFF/65535.\n");
 	wprintf(L"   -aun Count        Specifie DNS header Authority count.\n                     Authority count must between 0x0001 - 0xFFFF/65535.\n");
 	wprintf(L"   -adn Count        Specifie DNS header Additional count.\n                     Additional count must between 0x0001 - 0xFFFF/65535.\n");
-	wprintf(L"   -ti Time          Specifie transmission interval time(in milliseconds).\n");
+	wprintf(L"   -ti IntervalTime  Specifie transmission interval time(in milliseconds).\n");
 	wprintf(L"   -edns0            Send with EDNS0 Label.\n");
 	wprintf(L"   -payload Length   Specifie EDNS0 Label UDP Payload length.\n                     Payload length must between 512 - 0xFFFF/65535.\n");
-	wprintf(L"   -dnssec           Send with DNSSEC requesting.\n                     EDNS0 Label will enable when DNSSEC is enable\n");
-	wprintf(L"   -qt Type          Specifie query type.\n");
+	wprintf(L"   -dnssec           Send with DNSSEC requesting.\n                     EDNS0 Label will enable when DNSSEC is enable.\n");
+	wprintf(L"   -qt Type          Specifie Query type.\n                     Query type must between 0x0001 - 0xFFFF/65535.\n");
 	wprintf(L"                     Type: A|NS|CNAME|SOA|PTR|MX|TXT|RP|SIG|KEY|AAAA|LOC|SRV|\n");
 	wprintf(L"                           NAPTR|KX|CERT|DNAME|EDNS0|APL|DS|SSHFP|IPSECKEY|\n");
 	wprintf(L"                           RRSIG|NSEC|DNSKEY|DHCID|NSEC3|NSEC3PARAM|HIP|SPF|\n");
 	wprintf(L"                           TKEY|TSIG|IXFR|AXFR|ANY|TA|DLV\n");
-	wprintf(L"   -qc Classes       Specifie query classes.\n");
+	wprintf(L"   -qc Classes       Specifie Query classes.\n                     Query classes must between 0x0001 - 0xFFFF/65535.\n");
 	wprintf(L"                     Classes: IN|CSNET|CHAOS|HESIOD|NONE|ALL|ANY\n");
-	wprintf(L"   -p Port           Specifie UDP port.\n                     UDP port must between 0x0001 - 0xFFFF/65535.\n");
-	wprintf(L"   -raw RAW_Data     Specifie Raw data to send.\n");
+	wprintf(L"   -p ServiceName    Specifie UDP port/protocol(Sevice names).\n                     UDP port must between 0x0001 - 0xFFFF/65535.\n");
+	wprintf(L"                     Protocol: TCPMUX|ECHO|DISCARD|SYSTAT|DAYTIME|NETSTAT|\n");
+	wprintf(L"                               QOTD|MSP|CHARGEN|FTP|SSH|TELNET|SMTP|\n");
+	wprintf(L"                               TIME|RAP|RLP|NAME|WHOIS|TACACS|XNSAUTH|MTP|\n");
+	wprintf(L"                               BOOTPS|BOOTPC|TFTP|RJE|FINGER|TTYLINK|SUPDUP|\n");
+	wprintf(L"                               SUNRPC|SQL|NTP|EPMAP|NETBIOSNS|NETBIOSDGM|\n");
+	wprintf(L"                               NETBIOSSSN|IMAP|BFTP|SGMP|SQLSRV|DMSP|SNMP|\n");
+	wprintf(L"                               SNMPTRAP|ATRTMP|ATHBP|QMTP|IPX|IMAP|IMAP3|\n");
+	wprintf(L"                               BGMP|TSP|IMMP|ODMR|RPC2PORTMAP|CLEARCASE|\n");
+	wprintf(L"                               HPALARMMGR|ARNS|AURP|LDAP|UPS|SLP|SNPP|\n");
+	wprintf(L"                               MICROSOFTDS|KPASSWD|TCPNETHASPSRV|RETROSPECT|\n");
+	wprintf(L"                               ISAKMP|BIFFUDP|WHOSERVER|SYSLOG|ROUTERSERVER|\n");
+	wprintf(L"                               NCP|COURIER|COMMERCE|RTSP|NNTP|HTTPRPCEPMAP|\n");
+	wprintf(L"                               IPP|LDAPS|MSDP|AODV|FTPSDATA|FTPS|NAS|TELNETS\n");
+	wprintf(L"   -rawdata RAW_Data Specifie Raw data to send.\n");
 	wprintf(L"                     RAW_Data is hex, but do not add \"0x\" before hex.\n");
 	wprintf(L"                     Length of RAW_Data must between 64 - 1512 bytes.\n");
-	wprintf(L"   -buf Size         Specifie receive buffer size.\n                     Buffer size must between 512 - 4096(bytes).\n");
+	wprintf(L"   -raw ServiceName  Specifie Raw socket type.\n");
+	wprintf(L"                     Service Name: HOPOPTS|ICMP|IGMP|GGP|IPV4|ST|TCP|CBT|EGP|\n");
+	wprintf(L"                                   IGP|PUP|IDP|IPV6|ROUTING|ESP|FRAGMENT|AH|\n");
+	wprintf(L"                                   ICMPV6|NONE|DSTOPTS|ND|ICLFXBM|PIM|PGM|L2TP|\n");
+	wprintf(L"                                   SCTP|RAW\n");
+	wprintf(L"   -buf Size         Specifie receive buffer size.\n                     Buffer size must between 512 - 4096 bytes.\n");
+	wprintf(L"   -of FileName      Output result to file.\n                     FileName must less than 260 bytes.\n");
 	wprintf(L"   -6                Using IPv6.\n");
 	wprintf(L"   -4                Using IPv4.\n");
 	wprintf(L"   Test_DomainName   A domain name which will make requesting to send \n");

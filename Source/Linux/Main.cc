@@ -19,18 +19,19 @@
 
 #include "DNSPing.h"
 
-std::string TestDomain, TargetString, TargetDomainString;
+std::string TestDomain, TargetString, TargetDomainString, OutputFileName;
 long double TotalTime = 0, MaxTime = 0, MinTime = 0;
 size_t SendNum = DEFAULT_SEND_TIMES, RealSendNum = 0, RecvNum = 0, TransmissionInterval = 0, BufferSize = PACKET_MAXSIZE, RawDataLen = 0, EDNS0PayloadSize = 0;
 sockaddr_storage SockAddr = {0};
-uint16_t Port = 0;
+uint16_t Protocol = 0, ServiceName = 0;
 std::shared_ptr<char> RawData;
 int IP_HopLimits = 0;
 timeval SocketTimeout = {DEFAULT_TIME_OUT, 0};
-auto /* IPv4_DF = false, */ EDNS0 = false;
+auto RawSocket = false, /* IPv4_DF = false, */ EDNS0 = false;
 dns_hdr HeaderParameter = {0};
 dns_qry QueryParameter = {0};
 dns_edns0_label EDNS0Parameter = {0};
+FILE *OutputFile = nullptr;
 
 //Main function of program
 int main(int argc, char *argv[])
@@ -78,7 +79,7 @@ int main(int argc, char *argv[])
 					Index++;
 					Parameter = argv[Index];
 
-					Result = atol(Parameter.c_str());
+					Result = strtol(Parameter.c_str(), nullptr, 0);
 					if (Result > 0 && Result <= U16_MAXNUM)
 					{
 						SendNum = Result;
@@ -109,7 +110,7 @@ int main(int argc, char *argv[])
 					Index++;
 					Parameter = argv[Index];
 
-					Result = atol(Parameter.c_str());
+					Result = strtol(Parameter.c_str(), nullptr, 0);
 					if (Result > 0 && Result <= U8_MAXNUM)
 					{
 						IP_HopLimits = (int)Result;
@@ -132,8 +133,8 @@ int main(int argc, char *argv[])
 					Index++;
 					Parameter = argv[Index];
 
-					Result = atol(Parameter.c_str());
-					if (Result >= 500 && Result < U16_MAXNUM)
+					Result = strtol(Parameter.c_str(), nullptr, 0);
+					if (Result >= TIME_OUT_MIN && Result < U16_MAXNUM)
 					{
 						SocketTimeout.tv_sec = (time_t)(Result / 1000);
 						SocketTimeout.tv_usec = (suseconds_t)(Result % 1000 * 1000);
@@ -156,7 +157,7 @@ int main(int argc, char *argv[])
 					Index++;
 					Parameter = argv[Index];
 
-					Result = atol(Parameter.c_str());
+					Result = strtol(Parameter.c_str(), nullptr, 0);
 					if (Result > 0 && Result <= U16_MAXNUM)
 					{
 						HeaderParameter.ID = htons((uint16_t)Result);
@@ -184,7 +185,7 @@ int main(int argc, char *argv[])
 					Index++;
 					Parameter = argv[Index];
 
-					Result = atol(Parameter.c_str());
+					Result = strtol(Parameter.c_str(), nullptr, 0);
 					if (Result > 0 && Result <= U4_MAXNUM)
 					{
 					#if BYTE_ORDER == LITTLE_ENDIAN
@@ -245,7 +246,7 @@ int main(int argc, char *argv[])
 					Index++;
 					Parameter = argv[Index];
 
-					Result = atol(Parameter.c_str());
+					Result = strtol(Parameter.c_str(), nullptr, 0);
 					if (Result > 0 && Result <= U4_MAXNUM)
 					{
 					#if BYTE_ORDER == LITTLE_ENDIAN
@@ -276,7 +277,7 @@ int main(int argc, char *argv[])
 					Index++;
 					Parameter = argv[Index];
 
-					Result = atol(Parameter.c_str());
+					Result = strtol(Parameter.c_str(), nullptr, 0);
 					if (Result > 0 && Result <= U16_MAXNUM)
 					{
 						HeaderParameter.Questions = htons((uint16_t)Result);
@@ -299,7 +300,7 @@ int main(int argc, char *argv[])
 					Index++;
 					Parameter = argv[Index];
 
-					Result = atol(Parameter.c_str());
+					Result = strtol(Parameter.c_str(), nullptr, 0);
 					if (Result > 0 && Result <= U16_MAXNUM)
 					{
 						HeaderParameter.Answer = htons((uint16_t)Result);
@@ -322,7 +323,7 @@ int main(int argc, char *argv[])
 					Index++;
 					Parameter = argv[Index];
 
-					Result = atol(Parameter.c_str());
+					Result = strtol(Parameter.c_str(), nullptr, 0);
 					if (Result > 0 && Result <= U16_MAXNUM)
 					{
 						HeaderParameter.Authority = htons((uint16_t)Result);
@@ -345,7 +346,7 @@ int main(int argc, char *argv[])
 					Index++;
 					Parameter = argv[Index];
 
-					Result = atol(Parameter.c_str());
+					Result = strtol(Parameter.c_str(), nullptr, 0);
 					if (Result > 0 && Result <= U16_MAXNUM)
 					{
 						HeaderParameter.Additional = htons((uint16_t)Result);
@@ -368,7 +369,7 @@ int main(int argc, char *argv[])
 					Index++;
 					Parameter = argv[Index];
 
-					Result = atol(Parameter.c_str());
+					Result = strtol(Parameter.c_str(), nullptr, 0);
 					if (Result >= 0)
 					{
 						TransmissionInterval = Result * 1000;
@@ -396,7 +397,7 @@ int main(int argc, char *argv[])
 					Index++;
 					Parameter = argv[Index];
 
-					Result = atol(Parameter.c_str());
+					Result = strtol(Parameter.c_str(), nullptr, 0);
 					if (Result > OLD_DNS_MAXSIZE && Result <= U16_MAXNUM)
 					{
 						EDNS0PayloadSize = Result;
@@ -427,7 +428,7 @@ int main(int argc, char *argv[])
 					Index++;
 					Parameter = argv[Index];
 
-				//Name types
+				//Type name
 					if (Parameter == ("A") || Parameter == ("a"))
 					{
 						QueryParameter.Type = htons(DNS_A_RECORDS);
@@ -576,9 +577,9 @@ int main(int argc, char *argv[])
 					{
 						QueryParameter.Type = htons(DNS_DLV_RECORDS);
 					}
+				//Type number
 					else {
-					//Number types
-						Result = atol(Parameter.c_str());
+						Result = strtol(Parameter.c_str(), nullptr, 0);
 						if (Result > 0 && Result <= U16_MAXNUM)
 						{
 							QueryParameter.Type = htons((uint16_t)Result);
@@ -602,7 +603,7 @@ int main(int argc, char *argv[])
 					Index++;
 					Parameter = argv[Index];
 
-				//Name types
+				//Classes name
 					if (Parameter == ("INTERNET") || Parameter == ("internet") || Parameter == ("IN") || Parameter == ("in"))
 					{
 						QueryParameter.Classes = htons(DNS_CLASS_IN);
@@ -627,9 +628,9 @@ int main(int argc, char *argv[])
 					{
 						QueryParameter.Classes = htons(DNS_CLASS_ANY);
 					}
+				//Classes number
 					else {
-					//Number types
-						Result = atol(Parameter.c_str());
+						Result = strtol(Parameter.c_str(), nullptr, 0);
 						if (Result > 0 && Result <= U16_MAXNUM)
 						{
 							QueryParameter.Classes = htons((uint16_t)Result);
@@ -645,7 +646,7 @@ int main(int argc, char *argv[])
 					return EXIT_FAILURE;
 				}
 			}
-		//Specifie requesting port.
+		//Specifie requesting server name or port.
 			else if (Parameter == ("-p"))
 			{
 				if (Index + 1U < (size_t)argc)
@@ -653,14 +654,370 @@ int main(int argc, char *argv[])
 					Index++;
 					Parameter = argv[Index];
 
-					Result = atol(Parameter.c_str());
-					if (Result > 0 && Result <= U16_MAXNUM)
+				//Server name
+					if (Parameter == ("TCPMUX") || Parameter == ("tcpmux"))
 					{
-						Port = htons((uint16_t)Result);
+						ServiceName = htons(IPPORT_TCPMUX);
 					}
+					else if (Parameter == ("ECHO") || Parameter == ("echo"))
+					{
+						ServiceName = htons(IPPORT_ECHO);
+					}
+					else if (Parameter == ("DISCARD") || Parameter == ("discard"))
+					{
+						ServiceName = htons(IPPORT_DISCARD);
+					}
+					else if (Parameter == ("SYSTAT") || Parameter == ("systat"))
+					{
+						ServiceName = htons(IPPORT_SYSTAT);
+					}
+					else if (Parameter == ("DAYTIME") || Parameter == ("daytime"))
+					{
+						ServiceName = htons(IPPORT_DAYTIME);
+					}
+					else if (Parameter == ("NETSTAT") || Parameter == ("netstat"))
+					{
+						ServiceName = htons(IPPORT_NETSTAT);
+					}
+					else if (Parameter == ("QOTD") || Parameter == ("qotd"))
+					{
+						ServiceName = htons(IPPORT_QOTD);
+					}
+					else if (Parameter == ("MSP") || Parameter == ("msp"))
+					{
+						ServiceName = htons(IPPORT_MSP);
+					}
+					else if (Parameter == ("CHARGEN") || Parameter == ("chargen"))
+					{
+						ServiceName = htons(IPPORT_CHARGEN);
+					}
+					else if (Parameter == ("FTPDATA") || Parameter == ("ftpdata"))
+					{
+						ServiceName = htons(IPPORT_FTP_DATA);
+					}
+					else if (Parameter == ("FTP") || Parameter == ("ftp"))
+					{
+						ServiceName = htons(IPPORT_FTP);
+					}
+					else if (Parameter == ("SSH") || Parameter == ("ssh"))
+					{
+						ServiceName = htons(IPPORT_SSH);
+					}
+					else if (Parameter == ("TELNET") || Parameter == ("telnet"))
+					{
+						ServiceName = htons(IPPORT_TELNET);
+					}
+					else if (Parameter == ("SMTP") || Parameter == ("smtp"))
+					{
+						ServiceName = htons(IPPORT_SMTP);
+					}
+					else if (Parameter == ("TIME") || Parameter == ("time"))
+					{
+						ServiceName = htons(IPPORT_TIMESERVER);
+					}
+					else if (Parameter == ("RAP") || Parameter == ("rap"))
+					{
+						ServiceName = htons(IPPORT_RAP);
+					}
+					else if (Parameter == ("RLP") || Parameter == ("rlp"))
+					{
+						ServiceName = htons(IPPORT_RLP);
+					}
+					else if (Parameter == ("NAME") || Parameter == ("name"))
+					{
+						ServiceName = htons(IPPORT_NAMESERVER);
+					}
+					else if (Parameter == ("WHOIS") || Parameter == ("whois"))
+					{
+						ServiceName = htons(IPPORT_WHOIS);
+					}
+					else if (Parameter == ("TACACS") || Parameter == ("tacacs"))
+					{
+						ServiceName = htons(IPPORT_TACACS);
+					}
+					else if (Parameter == ("XNSAUTH") || Parameter == ("xnsauth"))
+					{
+						ServiceName = htons(IPPORT_XNSAUTH);
+					}
+					else if (Parameter == ("MTP") || Parameter == ("mtp"))
+					{
+						ServiceName = htons(IPPORT_MTP);
+					}
+					else if (Parameter == ("BOOTPS") || Parameter == ("bootps"))
+					{
+						ServiceName = htons(IPPORT_BOOTPS);
+					}
+					else if (Parameter == ("BOOTPC") || Parameter == ("bootpc"))
+					{
+						ServiceName = htons(IPPORT_BOOTPC);
+					}
+					else if (Parameter == ("TFTP") || Parameter == ("tftp"))
+					{
+						ServiceName = htons(IPPORT_TFTP);
+					}
+					else if (Parameter == ("RJE") || Parameter == ("rje"))
+					{
+						ServiceName = htons(IPPORT_RJE);
+					}
+					else if (Parameter == ("FINGER") || Parameter == ("finger"))
+					{
+						ServiceName = htons(IPPORT_FINGER);
+					}
+					else if (Parameter == ("HTTP") || Parameter == ("http"))
+					{
+						ServiceName = htons(IPPORT_HTTP);
+					}
+					else if (Parameter == ("HTTPBACKUP") || Parameter == ("httpbackup"))
+					{
+						ServiceName = htons(IPPORT_HTTPBACKUP);
+					}
+					else if (Parameter == ("TTYLINK") || Parameter == ("ttylink"))
+					{
+						ServiceName = htons(IPPORT_TTYLINK);
+					}
+					else if (Parameter == ("SUPDUP") || Parameter == ("supdup"))
+					{
+						ServiceName = htons(IPPORT_SUPDUP);
+					}
+					else if (Parameter == ("POP3") || Parameter == ("pop3"))
+					{
+						ServiceName = htons(IPPORT_POP3);
+					}
+					else if (Parameter == ("SUNRPC") || Parameter == ("sunrpc"))
+					{
+						ServiceName = htons(IPPORT_SUNRPC);
+					}
+					else if (Parameter == ("SQL") || Parameter == ("sql"))
+					{
+						ServiceName = htons(IPPORT_SQL);
+					}
+					else if (Parameter == ("NTP") || Parameter == ("ntp"))
+					{
+						ServiceName = htons(IPPORT_NTP);
+					}
+					else if (Parameter == ("EPMAP") || Parameter == ("epmap"))
+					{
+						ServiceName = htons(IPPORT_EPMAP);
+					}
+					else if (Parameter == ("NETBIOSNS") || Parameter == ("netbiosns"))
+					{
+						ServiceName = htons(IPPORT_NETBIOS_NS);
+					}
+					else if (Parameter == ("NETBIOSDGM") || Parameter == ("netbiosdgm"))
+					{
+						ServiceName = htons(IPPORT_NETBIOS_DGM);
+					}
+					else if (Parameter == ("NETBIOSSSN") || Parameter == ("netbiosssn"))
+					{
+						ServiceName = htons(IPPORT_NETBIOS_SSN);
+					}
+					else if (Parameter == ("IMAP") || Parameter == ("imap"))
+					{
+						ServiceName = htons(IPPORT_IMAP);
+					}
+					else if (Parameter == ("BFTP") || Parameter == ("bftp"))
+					{
+						ServiceName = htons(IPPORT_BFTP);
+					}
+					else if (Parameter == ("SGMP") || Parameter == ("sgmp"))
+					{
+						ServiceName = htons(IPPORT_SGMP);
+					}
+					else if (Parameter == ("SQLSRV") || Parameter == ("sqlsrv"))
+					{
+						ServiceName = htons(IPPORT_SQLSRV);
+					}
+					else if (Parameter == ("DMSP") || Parameter == ("dmsp"))
+					{
+						ServiceName = htons(IPPORT_DMSP);
+					}
+					else if (Parameter == ("SNMP") || Parameter == ("snmp"))
+					{
+						ServiceName = htons(IPPORT_SNMP);
+					}
+					else if (Parameter == ("SNMPTRAP") || Parameter == ("snmptrap"))
+					{
+						ServiceName = htons(IPPORT_SNMP_TRAP);
+					}
+					else if (Parameter == ("ATRTMP") || Parameter == ("atrtmp"))
+					{
+						ServiceName = htons(IPPORT_ATRTMP);
+					}
+					else if (Parameter == ("ATHBP") || Parameter == ("athbp"))
+					{
+						ServiceName = htons(IPPORT_ATHBP);
+					}
+					else if (Parameter == ("QMTP") || Parameter == ("qmtp"))
+					{
+						ServiceName = htons(IPPORT_QMTP);
+					}
+					else if (Parameter == ("IPX") || Parameter == ("ipx"))
+					{
+						ServiceName = htons(IPPORT_IPX);
+					}
+					else if (Parameter == ("IMAP3") || Parameter == ("imap3"))
+					{
+						ServiceName = htons(IPPORT_IMAP3);
+					}
+					else if (Parameter == ("BGMP") || Parameter == ("bgmp"))
+					{
+						ServiceName = htons(IPPORT_BGMP);
+					}
+					else if (Parameter == ("TSP") || Parameter == ("tsp"))
+					{
+						ServiceName = htons(IPPORT_TSP);
+					}
+					else if (Parameter == ("IMMP") || Parameter == ("immp"))
+					{
+						ServiceName = htons(IPPORT_IMMP);
+					}
+					else if (Parameter == ("ODMR") || Parameter == ("odmr"))
+					{
+						ServiceName = htons(IPPORT_ODMR);
+					}
+					else if (Parameter == ("RPC2PORTMAP") || Parameter == ("rpc2portmap"))
+					{
+						ServiceName = htons(IPPORT_RPC2PORTMAP);
+					}
+					else if (Parameter == ("CLEARCASE") || Parameter == ("clearcase"))
+					{
+						ServiceName = htons(IPPORT_CLEARCASE);
+					}
+					else if (Parameter == ("HPALARMMGR") || Parameter == ("hpalarmmgr"))
+					{
+						ServiceName = htons(IPPORT_HPALARMMGR);
+					}
+					else if (Parameter == ("ARNS") || Parameter == ("arns"))
+					{
+						ServiceName = htons(IPPORT_ARNS);
+					}
+					else if (Parameter == ("AURP") || Parameter == ("aurp"))
+					{
+						ServiceName = htons(IPPORT_AURP);
+					}
+					else if (Parameter == ("LDAP") || Parameter == ("ldap"))
+					{
+						ServiceName = htons(IPPORT_LDAP);
+					}
+					else if (Parameter == ("UPS") || Parameter == ("ups"))
+					{
+						ServiceName = htons(IPPORT_UPS);
+					}
+					else if (Parameter == ("SLP") || Parameter == ("slp"))
+					{
+						ServiceName = htons(IPPORT_SLP);
+					}
+					else if (Parameter == ("HTTPS") || Parameter == ("https"))
+					{
+						ServiceName = htons(IPPORT_HTTPS);
+					}
+					else if (Parameter == ("SNPP") || Parameter == ("snpp"))
+					{
+						ServiceName = htons(IPPORT_SNPP);
+					}
+					else if (Parameter == ("MICROSOFTDS") || Parameter == ("microsoftds"))
+					{
+						ServiceName = htons(IPPORT_MICROSOFT_DS);
+					}
+					else if (Parameter == ("KPASSWD") || Parameter == ("kpasswd"))
+					{
+						ServiceName = htons(IPPORT_KPASSWD);
+					}
+					else if (Parameter == ("TCPNETHASPSRV") || Parameter == ("tcpnethaspsrv"))
+					{
+						ServiceName = htons(IPPORT_TCPNETHASPSRV);
+					}
+					else if (Parameter == ("RETROSPECT") || Parameter == ("retrospect"))
+					{
+						ServiceName = htons(IPPORT_RETROSPECT);
+					}
+					else if (Parameter == ("ISAKMP") || Parameter == ("isakmp"))
+					{
+						ServiceName = htons(IPPORT_ISAKMP);
+					}
+					else if (Parameter == ("BIFFUDP") || Parameter == ("biffudp"))
+					{
+						ServiceName = htons(IPPORT_BIFFUDP);
+					}
+					else if (Parameter == ("WHOSERVER") || Parameter == ("whoserver"))
+					{
+						ServiceName = htons(IPPORT_WHOSERVER);
+					}
+					else if (Parameter == ("SYSLOG") || Parameter == ("syslog"))
+					{
+						ServiceName = htons(IPPORT_SYSLOG);
+					}
+					else if (Parameter == ("ROUTERSERVER") || Parameter == ("routerserver"))
+					{
+						ServiceName = htons(IPPORT_ROUTESERVER);
+					}
+					else if (Parameter == ("NCP") || Parameter == ("ncp"))
+					{
+						ServiceName = htons(IPPORT_NCP);
+					}
+					else if (Parameter == ("COURIER") || Parameter == ("courier"))
+					{
+						ServiceName = htons(IPPORT_COURIER);
+					}
+					else if (Parameter == ("COMMERCE") || Parameter == ("commerce"))
+					{
+						ServiceName = htons(IPPORT_COMMERCE);
+					}
+					else if (Parameter == ("RTSP") || Parameter == ("rtsp"))
+					{
+						ServiceName = htons(IPPORT_RTSP);
+					}
+					else if (Parameter == ("NNTP") || Parameter == ("nntp"))
+					{
+						ServiceName = htons(IPPORT_NNTP);
+					}
+					else if (Parameter == ("HTTPRPCEPMAP") || Parameter == ("httprpcepmap"))
+					{
+						ServiceName = htons(IPPORT_HTTPRPCEPMAP);
+					}
+					else if (Parameter == ("IPP") || Parameter == ("ipp"))
+					{
+						ServiceName = htons(IPPORT_IPP);
+					}
+					else if (Parameter == ("LDAPS") || Parameter == ("ldaps"))
+					{
+						ServiceName = htons(IPPORT_LDAPS);
+					}
+					else if (Parameter == ("MSDP") || Parameter == ("msdp"))
+					{
+						ServiceName = htons(IPPORT_MSDP);
+					}
+					else if (Parameter == ("AODV") || Parameter == ("aodv"))
+					{
+						ServiceName = htons(IPPORT_AODV);
+					}
+					else if (Parameter == ("FTPSDATA") || Parameter == ("ftpsdata"))
+					{
+						ServiceName = htons(IPPORT_FTPSDATA);
+					}
+					else if (Parameter == ("FTPS") || Parameter == ("ftps"))
+					{
+						ServiceName = htons(IPPORT_FTPS);
+					}
+					else if (Parameter == ("NAS") || Parameter == ("nas"))
+					{
+						ServiceName = htons(IPPORT_NAS);
+					}
+					else if (Parameter == ("TELNETS") || Parameter == ("telnets"))
+					{
+						ServiceName = htons(IPPORT_NAS);
+					}
+				//Number port
 					else {
-						wprintf(L"\nParameter[-p Port] error.\n");
-						return EXIT_FAILURE;
+						Result = strtol(Parameter.c_str(), nullptr, 0);
+						if (Result > 0 && Result <= U16_MAXNUM)
+						{
+							ServiceName = htons((uint16_t)Result);
+						}
+						else {
+							wprintf(L"\nParameter[-p ServiceName/Protocol] error.\n");
+							return EXIT_FAILURE;
+						}
 					}
 				}
 				else {
@@ -669,7 +1026,7 @@ int main(int argc, char *argv[])
 				}
 			}
 		//Specifie Raw data to send.
-			else if (Parameter == ("-RAW") || Parameter == ("-raw"))
+			else if (Parameter == ("-RAWDATA") || Parameter == ("-rawdata"))
 			{
 				if (Index + 1U < (size_t)argc)
 				{
@@ -679,13 +1036,13 @@ int main(int argc, char *argv[])
 					std::string RawDataString = argv[Index];
 					if (RawDataString.length() < PACKET_MINSIZE && RawDataString.length() > PACKET_MAXSIZE)
 					{
-						wprintf(L"\nParameter[-raw RAW_Data] error.\n");
+						wprintf(L"\nParameter[-rawdata RAW_Data] error.\n");
 						return EXIT_FAILURE;
 					}
 					std::shared_ptr<char> TempRawData(new char[PACKET_MAXSIZE]());
 					RawData.swap(TempRawData);
 					TempRawData.reset();
-					std::shared_ptr<char> Temp(new char[4U]());
+					std::shared_ptr<char> Temp(new char[5U]());
 					Temp.get()[0] = 48; //"0"
 					Temp.get()[1U] = 120; //"x"
 
@@ -693,14 +1050,157 @@ int main(int argc, char *argv[])
 					for (size_t InnerIndex = 0;InnerIndex < RawDataString.length();InnerIndex++)
 					{
 						Temp.get()[2U] = RawDataString[InnerIndex];
-						Result = strtol(Temp.get(), NULL, 16);
-						if (Result > 0 && Result <= U4_MAXNUM)
+						InnerIndex++;
+						Temp.get()[3U] = RawDataString[InnerIndex];
+						Result = strtol(Temp.get(), nullptr, 0);
+						if (Result > 0 && Result <= U8_MAXNUM)
 						{
 							RawData.get()[RawDataLen] = (char)Result;
 							RawDataLen++;
 						}
 						else {
-							wprintf(L"\nParameter[-raw RAW_Data] error.\n");
+							wprintf(L"\nParameter[-rawdata RAW_Data] error.\n");
+							return EXIT_FAILURE;
+						}
+					}
+				}
+				else {
+					wprintf(L"\nNot enough parameters error.\n");
+					return EXIT_FAILURE;
+				}
+			}
+		//Send RAW data with Raw Socket.
+			else if (Parameter == ("-RAW") || Parameter == ("-raw"))
+			{
+				if (Index + 1U < (size_t)argc)
+				{
+					Index++;
+					Parameter = argv[Index];
+
+				//Protocol name
+					RawSocket = true;
+					if (Parameter == ("UDP") || Parameter == ("udp"))
+					{
+						RawSocket = false;
+						continue;
+					}
+					else if (Parameter == ("HOPOPTS") || Parameter == ("hopopts"))
+					{
+						ServiceName = IPPROTO_HOPOPTS;
+					}
+					else if (Parameter == ("ICMP") || Parameter == ("icmp"))
+					{
+						ServiceName = IPPROTO_ICMP;
+					}
+					else if (Parameter == ("IGMP") || Parameter == ("igmp"))
+					{
+						ServiceName = IPPROTO_IGMP;
+					}
+					else if (Parameter == ("GGP") || Parameter == ("ggp"))
+					{
+						ServiceName = IPPROTO_GGP;
+					}
+					else if (Parameter == ("IPV4") || Parameter == ("ipv4"))
+					{
+						ServiceName = IPPROTO_IPIP;
+					}
+					else if (Parameter == ("ST") || Parameter == ("st"))
+					{
+						ServiceName = IPPROTO_ST;
+					}
+					else if (Parameter == ("TCP") || Parameter == ("tcp"))
+					{
+						ServiceName = IPPROTO_TCP;
+					}
+					else if (Parameter == ("CBT") || Parameter == ("cbt"))
+					{
+						ServiceName = IPPROTO_CBT;
+					}
+					else if (Parameter == ("EGP") || Parameter == ("egp"))
+					{
+						ServiceName = IPPROTO_EGP;
+					}
+					else if (Parameter == ("IGP") || Parameter == ("igp"))
+					{
+						ServiceName = IPPROTO_IGP;
+					}
+					else if (Parameter == ("PUP") || Parameter == ("pup"))
+					{
+						ServiceName = IPPROTO_PUP;
+					}
+					else if (Parameter == ("IDP") || Parameter == ("idp"))
+					{
+						ServiceName = IPPROTO_IDP;
+					}
+					else if (Parameter == ("IPV6") || Parameter == ("ipv6"))
+					{
+						ServiceName = IPPROTO_IPV6;
+					}
+					else if (Parameter == ("ROUTING") || Parameter == ("routing"))
+					{
+						ServiceName = IPPROTO_ROUTING;
+					}
+					else if (Parameter == ("ESP") || Parameter == ("esp"))
+					{
+						ServiceName = IPPROTO_ESP;
+					}
+					else if (Parameter == ("FRAGMENT") || Parameter == ("fragment"))
+					{
+						ServiceName = IPPROTO_FRAGMENT;
+					}
+					else if (Parameter == ("AH") || Parameter == ("ah"))
+					{
+						ServiceName = IPPROTO_AH;
+					}
+					else if (Parameter == ("ICMPV6") || Parameter == ("icmpv6"))
+					{
+						ServiceName = IPPROTO_ICMPV6;
+					}
+					else if (Parameter == ("NONE") || Parameter == ("none"))
+					{
+						ServiceName = IPPROTO_NONE;
+					}
+					else if (Parameter == ("DSTOPTS") || Parameter == ("dstopts"))
+					{
+						ServiceName = IPPROTO_DSTOPTS;
+					}
+					else if (Parameter == ("ND") || Parameter == ("nd"))
+					{
+						ServiceName = IPPROTO_ND;
+					}
+					else if (Parameter == ("ICLFXBM") || Parameter == ("iclfxbm"))
+					{
+						ServiceName = IPPROTO_ICLFXBM;
+					}
+					else if (Parameter == ("PIM") || Parameter == ("pim"))
+					{
+						ServiceName = IPPROTO_PIM;
+					}
+					else if (Parameter == ("PGM") || Parameter == ("pgm"))
+					{
+						ServiceName = IPPROTO_PGM;
+					}
+					else if (Parameter == ("L2TP") || Parameter == ("l2tp"))
+					{
+						ServiceName = IPPROTO_L2TP;
+					}
+					else if (Parameter == ("SCTP") || Parameter == ("sctp"))
+					{
+						ServiceName = IPPROTO_SCTP;
+					}
+					else if (Parameter == ("RAW") || Parameter == ("raw"))
+					{
+						ServiceName = IPPROTO_RAW;
+					}
+					else {
+					//Protocol number
+						Result = strtol(Parameter.c_str(), nullptr, 0);
+						if (Result > 0 && Result <= U4_MAXNUM)
+						{
+							ServiceName = (uint8_t)Result;
+						}
+						else {
+							wprintf(L"\nParameter[-raw ServiceName] error.\n");
 							return EXIT_FAILURE;
 						}
 					}
@@ -718,7 +1218,7 @@ int main(int argc, char *argv[])
 					Index++;
 					Parameter = argv[Index];
 
-					Result = atol(Parameter.c_str());
+					Result = strtol(Parameter.c_str(), nullptr, 0);
 					if (Result >= OLD_DNS_MAXSIZE && Result <= LARGE_PACKET_MAXSIZE)
 					{
 						BufferSize = Result;
@@ -733,15 +1233,37 @@ int main(int argc, char *argv[])
 					return EXIT_FAILURE;
 				}
 			}
+		//Output result to file.
+			else if (Parameter == ("-OF") || Parameter == ("-of"))
+			{
+				if (Index + 1U < (size_t)argc)
+				{
+					Index++;
+					Parameter = argv[Index];
+
+					if (Parameter.length() <= PATH_MAX)
+					{
+						OutputFileName = Parameter;
+					}
+					else {
+						wprintf(L"\nParameter[-of FileName] error.\n");
+						return EXIT_FAILURE;
+					}
+				}
+				else {
+					wprintf(L"\nNot enough parameters error.\n");
+					return EXIT_FAILURE;
+				}
+			}
 		//Using IPv6.
 			else if (Parameter == ("-6"))
 			{
-				SockAddr.ss_family = AF_INET6;
+				Protocol = AF_INET6;
 			}
 		//Using IPv4.
 			else if (Parameter == ("-4"))
 			{
-				SockAddr.ss_family = AF_INET;
+				Protocol = AF_INET;
 			}
 		//Specifie Query Domain.
 			else if (!RawData && TestDomain.empty() && Index == argc - 2 && Parameter.length() > 2U)
@@ -754,12 +1276,13 @@ int main(int argc, char *argv[])
 			//IPv6 address
 				if (Parameter.find(58) != std::string::npos)
 				{
-					if (SockAddr.ss_family == AF_INET)
+					if (Protocol == AF_INET)
 					{
 						wprintf(L"\nTarget protocol error.\n");
 						return EXIT_FAILURE;
 					}
 
+					Protocol = AF_INET6;
 					SockAddr.ss_family = AF_INET6;
 					if (AddressStringToBinary((char *)Parameter.c_str(), &((sockaddr_in6 *)&SockAddr)->sin6_addr, AF_INET6, Result) == EXIT_FAILURE)
 					{
@@ -778,24 +1301,32 @@ int main(int argc, char *argv[])
 						if (*StringIter < 46 || *StringIter == 47 || *StringIter > 57)
 						{
 							addrinfo AddrInfoHints = {0}, *AddrInfo = nullptr;
-							if (SockAddr.ss_family == AF_INET6) //IPv6
-							{
-								AddrInfoHints.ai_family = AF_INET6;
-							}
-							else { //IPv4
-								SockAddr.ss_family = AF_INET;
-								AddrInfoHints.ai_family = AF_INET;
-							}
+						//Try with IPv6.
+							if (Protocol == 0)
+								Protocol = AF_INET6;
+							AddrInfoHints.ai_family = Protocol;
+							SockAddr.ss_family = Protocol;
 
 						//Get address.
 							Result = getaddrinfo(Parameter.c_str(), NULL, &AddrInfoHints, &AddrInfo);
 							if (Result != 0)
 							{
-								wprintf(L"\nResolve domain name error, error code is %d.\n", (int)Result);
-								return EXIT_FAILURE;
+							//Retry with IPv4.
+								Protocol = AF_INET;
+								AddrInfoHints.ai_family = Protocol;
+								SockAddr.ss_family = Protocol;
+
+								Result = getaddrinfo(Parameter.c_str(), NULL, &AddrInfoHints, &AddrInfo);
+								if (Result != 0)
+								{
+									wprintf(L"\nResolve domain name error, error code is %d.\n", (int)Result);
+									return EXIT_FAILURE;
+								}
 							}
-							else {
-							//Get address form PTR.
+
+						//Get address form PTR.
+							if (AddrInfo != nullptr)
+							{
 								for (auto PTR = AddrInfo;PTR != nullptr;PTR = PTR->ai_next)
 								{
 								//IPv6
@@ -809,6 +1340,7 @@ int main(int argc, char *argv[])
 										TargetDomainString = Parameter;
 										std::shared_ptr<char> Buffer(new char[ADDR_STRING_MAXSIZE]());
 										inet_ntop(AF_INET6, &((sockaddr_in6 *)&SockAddr)->sin6_addr, Buffer.get(), ADDR_STRING_MAXSIZE);
+										
 										TargetString.append("[");
 										TargetString.append(Buffer.get());
 										TargetString.append("]");
@@ -825,6 +1357,7 @@ int main(int argc, char *argv[])
 										TargetDomainString = Parameter;
 										std::shared_ptr<char> Buffer(new char[ADDR_STRING_MAXSIZE]());
 										inet_ntop(AF_INET, &((sockaddr_in *)&SockAddr)->sin_addr, Buffer.get(), ADDR_STRING_MAXSIZE);
+										
 										TargetString = Buffer.get();
 										break;
 									}
@@ -839,12 +1372,13 @@ int main(int argc, char *argv[])
 					//IPv4
 						if (StringIter == Parameter.end() - 1U)
 						{
-							if (SockAddr.ss_family == AF_INET6)
+							if (Protocol == AF_INET6)
 							{
 								wprintf(L"\nTarget protocol error.\n");
 								return EXIT_FAILURE;
 							}
 
+							Protocol = AF_INET;
 							SockAddr.ss_family = AF_INET;
 							if (AddressStringToBinary(Parameter.c_str(), &((sockaddr_in *)&SockAddr)->sin_addr, AF_INET, Result) == EXIT_FAILURE)
 							{
@@ -869,13 +1403,13 @@ int main(int argc, char *argv[])
 			}
 			else {
 			//Mark port.
-				if (Port == 0)
+				if (ServiceName == 0)
 				{
-					Port = htons(DNS_PORT);
+					ServiceName = htons(DNS_PORT);
 					((sockaddr_in6 *)&SockAddr)->sin6_port = htons(DNS_PORT);
 				}
 				else {
-					((sockaddr_in6 *)&SockAddr)->sin6_port = Port;
+					((sockaddr_in6 *)&SockAddr)->sin6_port = ServiceName;
 				}
 			}
 		}
@@ -887,13 +1421,13 @@ int main(int argc, char *argv[])
 			}
 			else {
 			//Mark port.
-				if (Port == 0)
+				if (ServiceName == 0)
 				{
-					Port = htons(DNS_PORT);
+					ServiceName = htons(DNS_PORT);
 					((sockaddr_in *)&SockAddr)->sin_port = htons(DNS_PORT);
 				}
 				else {
-					((sockaddr_in *)&SockAddr)->sin_port = Port;
+					((sockaddr_in *)&SockAddr)->sin_port = ServiceName;
 				}
 			}
 		}
@@ -936,6 +1470,20 @@ int main(int argc, char *argv[])
 				EDNS0Parameter.Z_Bits.DO = ~EDNS0Parameter.Z_Bits.DO; //Accepts DNSSEC security RRs
 			}
 		}
+		
+	//Output result to file.
+		if (!OutputFileName.empty())
+		{
+			OutputFile = fopen(OutputFileName.c_str(), ("w"));
+			if (OutputFile == nullptr)
+			{
+				wprintf(L"Create output result file %s error, error code is %d.\n", OutputFileName.c_str(), (int)Result);
+				return EXIT_SUCCESS;
+			}
+			else {
+				fwprintf(OutputFile, L"\n");
+			}
+		}
 
 	//Print to screen before sending.
 		wprintf(L"\n");
@@ -947,27 +1495,54 @@ int main(int argc, char *argv[])
 				if (getnameinfo((sockaddr *)&SockAddr, sizeof(sockaddr_in), FQDN.get(), NI_MAXHOST, nullptr, 0, NI_NUMERICSERV) != 0)
 				{
 					wprintf(L"Resolve addresses to host names error, error code is %d.\n", errno);
-					return EXIT_FAILURE;
+					wprintf(L"DNSPing %s:%u with %s:\n", TargetString.c_str(), ntohs(ServiceName), TestDomain.c_str());
+
+				//Output to file.
+					if (OutputFile != nullptr)
+						fwprintf(OutputFile, L"DNSPing %s:%u with %s:\n", TargetString.c_str(), ntohs(ServiceName), TestDomain.c_str());
 				}
 				else {
 					if (TargetString == FQDN.get())
 					{
-						wprintf(L"DNSPing %s:%u with %s:\n", TargetString.c_str(), ntohs(Port), TestDomain.c_str());
+						wprintf(L"DNSPing %s:%u with %s:\n", TargetString.c_str(), ntohs(ServiceName), TestDomain.c_str());
+						
+					//Output to file.
+						if (OutputFile != nullptr)
+							fwprintf(OutputFile, L"DNSPing %s:%u with %s:\n", TargetString.c_str(), ntohs(ServiceName), TestDomain.c_str());
 					}
 					else {
-						wprintf(L"DNSPing %s:%u [%s] with %s:\n", FQDN.get(), ntohs(Port), TargetString.c_str(), TestDomain.c_str());
+						wprintf(L"DNSPing %s:%u [%s] with %s:\n", FQDN.get(), ntohs(ServiceName), TargetString.c_str(), TestDomain.c_str());
+						
+					//Output to file.
+						if (OutputFile != nullptr)
+							fwprintf(OutputFile, L"DNSPing %s:%u [%s] with %s:\n", FQDN.get(), ntohs(ServiceName), TargetString.c_str(), TestDomain.c_str());
 					}
 				}
 			}
 			else {
-				wprintf(L"DNSPing %s:%u [%s] with %s:\n", TargetDomainString.c_str(), ntohs(Port), TargetString.c_str(), TestDomain.c_str());
+				wprintf(L"DNSPing %s:%u [%s] with %s:\n", TargetDomainString.c_str(), ntohs(ServiceName), TargetString.c_str(), TestDomain.c_str());
+				
+			//Output to file.
+				if (OutputFile != nullptr)
+					fwprintf(OutputFile, L"DNSPing %s:%u [%s] with %s:\n", TargetDomainString.c_str(), ntohs(ServiceName), TargetString.c_str(), TestDomain.c_str());
 			}
 		}
 		else {
 			if (!TargetDomainString.empty())
-				wprintf(L"DNSPing %s:%u [%s] with %s:\n", TargetDomainString.c_str(), ntohs(Port), TargetString.c_str(), TestDomain.c_str());
-			else 
-				wprintf(L"DNSPing %s:%u with %s:\n", TargetString.c_str(), ntohs(Port), TestDomain.c_str());
+			{
+				wprintf(L"DNSPing %s:%u [%s] with %s:\n", TargetDomainString.c_str(), ntohs(ServiceName), TargetString.c_str(), TestDomain.c_str());
+				
+			//Output to file.
+				if (OutputFile != nullptr)
+					fwprintf(OutputFile, L"DNSPing %s:%u [%s] with %s:\n", TargetDomainString.c_str(), ntohs(ServiceName), TargetString.c_str(), TestDomain.c_str());
+			}
+			else {
+				wprintf(L"DNSPing %s:%u with %s:\n", TargetString.c_str(), ntohs(ServiceName), TestDomain.c_str());
+				
+			//Output to file.
+				if (OutputFile != nullptr)
+					fwprintf(OutputFile, L"DNSPing %s:%u with %s:\n", TargetString.c_str(), ntohs(ServiceName), TestDomain.c_str());
+			}
 		}
 
 	//Send.
@@ -978,12 +1553,19 @@ int main(int argc, char *argv[])
 				if (RealSendNum <= U16_MAXNUM)
 				{
 					RealSendNum++;
-					if (SendProcess(AF_INET, SockAddr) == EXIT_FAILURE)
+					if (SendProcess(SockAddr) == EXIT_FAILURE)
 						return EXIT_FAILURE;
 				}
 				else {
 					wprintf(L"\nStatistics is full.\n");
+				//Output to file.
+					if (OutputFile != nullptr)
+						fwprintf(OutputFile, L"\nStatistics is full.\n");
+
 					PrintProcess(true, true);
+				//Close file handle.
+					if (OutputFile != nullptr)
+						fclose(OutputFile);
 
 					return EXIT_SUCCESS;
 				}
@@ -993,13 +1575,23 @@ int main(int argc, char *argv[])
 			for (size_t Index = 0;Index < SendNum;Index++)
 			{
 				RealSendNum++;
-				if (SendProcess(AF_INET, SockAddr) == EXIT_FAILURE)
+				if (SendProcess(SockAddr) == EXIT_FAILURE)
+				{
+				//Close file handle.
+					if (OutputFile != nullptr)
+						fclose(OutputFile);
+
 					return EXIT_FAILURE;
+				}
 			}
 		}
 
 	//Print to screen before finished.
 		PrintProcess(true, true);
+		
+	//Close file handle.
+		if (OutputFile != nullptr)
+			fclose(OutputFile);
 	}
 	else {
 		PrintDescription();

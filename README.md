@@ -3,8 +3,8 @@
 Ping with DNS requesting.
 
 ### Version
-**Windows: v0.1 Beta(2014-08-23)**
-**Linux: v0.1 Beta(2014-08-23)**
+* **Windows: v0.1 Beta(2014-08-26)**
+* **Linux: v0.1 Beta(2014-08-26)**
 
 ### ReadMe
 * [Windows(English)](https://github.com/chengr28/DNSPing/wiki/ReadMe)
@@ -13,7 +13,7 @@ Ping with DNS requesting.
 * [Linux(Chinese-Simplified)](https://github.com/chengr28/DNSPing/wiki/ReadMe_Linux#%E7%94%A8%E6%B3%95)
 
 ### Usage
-`DNSPing [-h] [-t] [-a] [-n Count] [-f] [-i HopLimit/TTL] [-w Timeout] [-id DNS_ID] [-qr] [-opcode OPCode] [-aa] [-tc] [-rd] [-ra] [-ad] [-cd] [-rcode RCode] [-qn Count] [-ann Count] [-aun Count] [-adn Count] [-ti Time] [-edns0] [-payload Length] [-dnssec] [-qt Type] [-qc Classes] [-p Port] [-raw RAW_Data] [-buf Size] Test_DomainName Target`<br />
+`DNSPing [-h] [-t] [-a] [-n Count] [-f] [-i HopLimit/TTL] [-w Timeout] [-id DNS_ID] [-qr] [-opcode OPCode] [-aa] [-tc] [-rd] [-ra] [-ad] [-cd] [-rcode RCode] [-qn Count] [-ann Count] [-aun Count] [-adn Count] [-ti Time] [-edns0] [-payload Length] [-dnssec] [-qt Type] [-qc Classes] [-p ServiceName] [-rawdata RAW_Data] [-raw ServiceName] [-buf Size] [-of FileName] Test_DomainName Target`<br />
 
 * `[-f]` is only available in Windows.<br />
 
@@ -76,7 +76,7 @@ Ping with DNS requesting.
 * `-adn Count`
     * Specifie DNS header `Additional count`.<br />
     * `Additional count` must between 0x0001 - 0xFFFF/65535.<br />
-* `-ti Time`
+* `-ti IntervalTime`
     * Specifie transmission interval time(in milliseconds).<br />
 * `-edns0`
     * Send with `EDNS0 Label`.<br />
@@ -95,16 +95,38 @@ Ping with DNS requesting.
 * `-qc Classes`
     * Specifie `Query classes`.<br />
     * `Classes: IN|CSNET|CHAOS|HESIOD|NONE|ALL|ANY`<br />
-* `-p Port`
-    * Specifie `UDP port`.<br />
-    * `UDP port` must between 0x0001 - 0xFFFF/65535.<br />
-* `-raw RAW_Data`
+* `-p ServiceName`
+    * Specifie UDP port/protocol(Sevice names).<br />
+    * UDP port must between 0x0001 - 0xFFFF/65535.<br />
+    * `Protocol: TCPMUX|ECHO|DISCARD|SYSTAT|DAYTIME|NETSTAT|`<br />
+	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`QOTD|MSP|CHARGEN|FTP|SSH|TELNET|SMTP|`<br />
+	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`TIME|RAP|RLP|NAME|WHOIS|TACACS|XNSAUTH|MTP|`<br />
+	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`BOOTPS|BOOTPC|TFTP|RJE|FINGER|TTYLINK|SUPDUP|`<br />
+	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`SUNRPC|SQL|NTP|EPMAP|NETBIOSNS|NETBIOSDGM|`<br />
+	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`NETBIOSSSN|IMAP|BFTP|SGMP|SQLSRV|DMSP|SNMP|`<br />
+	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`SNMPTRAP|ATRTMP|ATHBP|QMTP|IPX|IMAP|IMAP3|`<br />
+	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`BGMP|TSP|IMMP|ODMR|RPC2PORTMAP|CLEARCASE|`<br />
+	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`HPALARMMGR|ARNS|AURP|LDAP|UPS|SLP|SNPP|`<br />
+	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`MICROSOFTDS|KPASSWD|TCPNETHASPSRV|RETROSPECT|`<br />
+	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`ISAKMP|BIFFUDP|WHOSERVER|SYSLOG|ROUTERSERVER|`<br />
+	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`NCP|COURIER|COMMERCE|RTSP|NNTP|HTTPRPCEPMAP|`<br />
+	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`IPP|LDAPS|MSDP|AODV|FTPSDATA|FTPS|NAS|TELNETS`<br />
+* `-rawdata RAW_Data`
     * Specifie Raw data to send.<br />
     * `RAW_Data` is hex, but do not add `0x` before hex.<br />
     * Length of `RAW_Data` must between 64 - 1512 bytes.<br />
+* `-raw ServiceName`
+    * Specifie Raw socket type.<br />
+    * `Service Name: HOPOPTS|ICMP|IGMP|GGP|IPV4|ST|TCP|CBT|EGP|`<br />
+	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`IGP|PUP|IDP|IPV6|ROUTING|ESP|FRAGMENT|AH|`<br />
+	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`ICMPV6|NONE|DSTOPTS|ND|ICLFXBM|PIM|PGM|L2TP|`<br />
+	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`SCTP|RAW`<br />
 * `-buf Size`
     * Specifie receive buffer size.<br />
     * `Buffer size` must between 512 - 4096 bytes.<br />
+* `-of FileName`
+    * Output result to file.<br />
+    * FileName must less than 260 bytes.<br />
 * `-6`
     * Using IPv6.<br />
 * `-4`
@@ -118,4 +140,6 @@ Ping with DNS requesting.
 GNU General Public License/GNU GPL v2
 
 ### Thanks
-* [tcping.exe - ping over a tcp connection](http://www.elifulkerson.com/projects/tcping.php)
+* [tcping.exe - Ping over a tcp connection.](http://www.elifulkerson.com/projects/tcping.php)
+* [tracetcp.exe - Traceroute utility that uses tcp syn packets to trace network routes.](https://simulatedsimian.github.io/tracetcp.html)
+* [tcpping - Ping look-alike that uses TCP SYN packets to get around firewalls and ICMP blackholes](https://github.com/jwyllie83/tcpping)

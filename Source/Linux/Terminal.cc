@@ -19,10 +19,16 @@
 
 #include "DNSPing.h"
 
+extern FILE *OutputFile;
+
 //Handle the system signal.
 void SIG_Handler(int Signal)
 {
 	PrintProcess(true, true);
+//Close file handle.
+	if (OutputFile != nullptr)
+		fclose(OutputFile);
+	
 	exit(EXIT_SUCCESS);
 	return;
 }

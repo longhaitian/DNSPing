@@ -25,6 +25,7 @@
 #include <string>                  //Strings
 
 //Portable Operating System Interface/POSIX and Unix system header
+#include <limits.h>                //Limits
 #include <pthread.h>               //Threads
 #include <signal.h>                //Signals
 #include <unistd.h>                //Standard library API
@@ -36,6 +37,86 @@
 #pragma pack(1)                    //Memory alignment: 1 bytes/8 bits
 
 // Protocol Header structures
+//Protocol defines
+#define IPPROTO_GGP                 3U
+#define IPPROTO_ST                  5U
+#define IPPROTO_CBT                 7U
+#define IPPROTO_IGP                 9U
+#define IPPROTO_ND                  77U
+#define IPPROTO_ICLFXBM             78U
+#define IPPROTO_PGM                 113U
+#define IPPROTO_L2TP                115U
+
+//Port defines(1 - 1024)
+#define IPPORT_TCPMUX               1U
+#define IPPORT_QOTD                 17U
+#define IPPORT_MSP                  18U
+#define IPPORT_CHARGEN              19U
+#define IPPORT_FTP_DATA             20U
+#define IPPORT_SSH                  22U
+#define IPPORT_RAP                  38U
+#define IPPORT_RLP                  39U
+#define IPPORT_TACACS               49U
+#define IPPORT_XNSAUTH              56U
+#define IPPORT_BOOTPS               67U
+#define IPPORT_BOOTPC               68U
+#define IPPORT_HTTP                 80U
+#define IPPORT_HTTPBACKUP           81U
+#define IPPORT_POP3                 110U
+#define IPPORT_SUNRPC               111U
+#define IPPORT_SQL                  118U
+#define IPPORT_NTP                  123U
+#define IPPORT_EPMAP                135U
+#define IPPORT_NETBIOS_NS           137U
+#define IPPORT_NETBIOS_DGM          138U
+#define IPPORT_NETBIOS_SSN          139U
+#define IPPORT_IMAP                 143U
+#define IPPORT_BFTP                 152U
+#define IPPORT_SGMP                 153U
+#define IPPORT_SQLSRV               156U
+#define IPPORT_DMSP                 158U
+#define IPPORT_SNMP                 161U
+#define IPPORT_SNMP_TRAP            162U
+#define IPPORT_ATRTMP               201U
+#define IPPORT_ATHBP                202U
+#define IPPORT_QMTP                 209U
+#define IPPORT_IPX                  213U
+#define IPPORT_IMAP3                220U
+#define IPPORT_BGMP                 264U
+#define IPPORT_TSP                  318U
+#define IPPORT_IMMP                 323U
+#define IPPORT_ODMR                 366U
+#define IPPORT_RPC2PORTMAP          369U
+#define IPPORT_CLEARCASE            371U
+#define IPPORT_HPALARMMGR           383U
+#define IPPORT_ARNS                 384U
+#define IPPORT_AURP                 387U
+#define IPPORT_LDAP                 389U
+#define IPPORT_UPS                  401U
+#define IPPORT_SLP                  427U
+#define IPPORT_HTTPS                443U
+#define IPPORT_SNPP                 444U
+#define IPPORT_MICROSOFT_DS         445U
+#define IPPORT_KPASSWD              464U
+#define IPPORT_TCPNETHASPSRV        475U
+#define IPPORT_RETROSPECT           497U
+#define IPPORT_ISAKMP               500U
+#define IPPORT_SYSLOG               514U
+#define IPPORT_NCP                  524U
+#define IPPORT_COURIER              530U
+#define IPPORT_COMMERCE             542U
+#define IPPORT_RTSP                 554U
+#define IPPORT_NNTP                 563U
+#define IPPORT_HTTPRPCEPMAP         593U
+#define IPPORT_IPP                  631U
+#define IPPORT_LDAPS                636U
+#define IPPORT_MSDP                 639U
+#define IPPORT_AODV                 654U
+#define IPPORT_FTPSDATA             989U
+#define IPPORT_FTPS                 990U
+#define IPPORT_NAS                  991U
+#define IPPORT_TELNETS              992U
+
 //Domain Name System/DNS Part
 /* About RFC standards
 RFC 920(https://tools.ietf.org/html/rfc920), Domain Requirements ¨C Specified original top-level domains
@@ -262,11 +343,9 @@ typedef struct _dns_edns0_
 #define U8_MAXNUM            0x00FF               //Maximum value of uint8_t/8 bits
 #define U16_MAXNUM           0xFFFF               //Maximum value of uint16_t/16 bits
 #define TIME_OUT             1000000U             //Timeout(1000000 us or 1000 ms or 1 second)
+#define TIME_OUT_MIN         500U                 //Minimum timeout(500 ms)
 #define DEFAULT_TIME_OUT     2U                   //Default timeout(2 seconds)
 #define DEFAULT_SEND_TIMES   4U                   //Default send times
-
-//Terminal.cc
-void SIG_Handler(int Signal);
 
 //Protocol.cc
 bool CheckEmptyBuffer(const void *Buffer, const size_t Length);
@@ -274,6 +353,9 @@ size_t AddressStringToBinary(const char *AddrString, void *pAddr, const uint16_t
 size_t CharToDNSQuery(const char *FName, char *TName);
 
 //Process.cc
-size_t SendProcess(const uint16_t Protocol, const sockaddr_storage Target);
+size_t SendProcess(const sockaddr_storage Target);
 size_t PrintProcess(const bool PacketStatistics, const bool TimeStatistics);
 void PrintDescription(void);
+
+//Terminal.cc
+void SIG_Handler(int Signal);
